@@ -46,16 +46,18 @@ class GTFSDataLoader:
         stops_file = os.path.join(self.gtfs_dir, "stops.txt")
         stop_name_to_stops = defaultdict(list)
 
-        with open(stops_file, 'r', encoding='utf-8-sig') as f:
+        with open(stops_file, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                stop_name_to_stops[row['stop_name']].append({
-                    'stop_id': row['stop_id'],
-                    'stop_name': row['stop_name'],
-                    'stop_desc': row['stop_desc'],
-                    'stop_lat': row['stop_lat'],
-                    'stop_lon': row['stop_lon']
-                })
+                stop_name_to_stops[row["stop_name"]].append(
+                    {
+                        "stop_id": row["stop_id"],
+                        "stop_name": row["stop_name"],
+                        "stop_desc": row["stop_desc"],
+                        "stop_lat": row["stop_lat"],
+                        "stop_lon": row["stop_lon"],
+                    }
+                )
 
         self._stops_cache = dict(stop_name_to_stops)
         return self._stops_cache
@@ -73,10 +75,10 @@ class GTFSDataLoader:
         routes_file = os.path.join(self.gtfs_dir, "routes.txt")
         routes = {}
 
-        with open(routes_file, 'r', encoding='utf-8-sig') as f:
+        with open(routes_file, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                routes[row['route_id']] = row['route_short_name']
+                routes[row["route_id"]] = row["route_short_name"]
 
         self._routes_cache = routes
         return self._routes_cache
@@ -100,13 +102,13 @@ class GTFSDataLoader:
         trips_file = os.path.join(self.gtfs_dir, "trips.txt")
         trips = {}
 
-        with open(trips_file, 'r', encoding='utf-8-sig') as f:
+        with open(trips_file, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                trips[row['trip_id']] = {
-                    'route_id': row['route_id'],
-                    'service_id': row['service_id'],
-                    'headsign': row['trip_headsign']
+                trips[row["trip_id"]] = {
+                    "route_id": row["route_id"],
+                    "service_id": row["service_id"],
+                    "headsign": row["trip_headsign"],
                 }
 
         self._trips_cache = trips
@@ -132,28 +134,30 @@ class GTFSDataLoader:
         print("stop_times.txtを読み込み中...")
         count = 0
 
-        with open(stop_times_file, 'r', encoding='utf-8-sig') as f:
+        with open(stop_times_file, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 count += 1
                 if count % 100000 == 0:
                     print(f"  処理中: {count}行...")
 
-                trip_id = row['trip_id']
-                stop_id = row['stop_id']
+                trip_id = row["trip_id"]
+                stop_id = row["stop_id"]
 
-                trip_to_stops[trip_id].append({
-                    'stop_id': stop_id,
-                    'stop_sequence': int(row['stop_sequence']),
-                    'arrival_time': row['arrival_time'],
-                    'departure_time': row['departure_time']
-                })
+                trip_to_stops[trip_id].append(
+                    {
+                        "stop_id": stop_id,
+                        "stop_sequence": int(row["stop_sequence"]),
+                        "arrival_time": row["arrival_time"],
+                        "departure_time": row["departure_time"],
+                    }
+                )
 
                 stop_to_trips[stop_id].add(trip_id)
 
         # 各tripの停車駅をstop_sequenceでソート
         for trip_id in trip_to_stops:
-            trip_to_stops[trip_id].sort(key=lambda x: x['stop_sequence'])
+            trip_to_stops[trip_id].sort(key=lambda x: x["stop_sequence"])
 
         print(f"  完了: {count}行を読み込みました")
 
@@ -176,10 +180,10 @@ class GTFSDataLoader:
         calendar_file = os.path.join(self.gtfs_dir, "calendar.txt")
         calendar = {}
 
-        with open(calendar_file, 'r', encoding='utf-8-sig') as f:
+        with open(calendar_file, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                calendar[row['service_id']] = row
+                calendar[row["service_id"]] = row
 
         self._calendar_cache = calendar
         return self._calendar_cache
@@ -196,9 +200,10 @@ def calculate_travel_time(departure_time: str, arrival_time: str) -> int:
     Returns:
         所要時間（分）
     """
+
     def parse_gtfs_time(time_str: str) -> int:
         """HH:MM:SSを分に変換（24時以降対応）"""
-        h, m, s = map(int, time_str.split(':'))
+        h, m, s = map(int, time_str.split(":"))
         return h * 60 + m
 
     dep_minutes = parse_gtfs_time(departure_time)
@@ -218,13 +223,19 @@ def determine_service_ids(day_type: str) -> set[str]:
     """
     # 基本的な運行パターン
     base_patterns = {
-        'weekday': {'01001', '01001_Gion', '01002_ritsumei', '01003_sandai',
-                    '01004_butsudai', '01005_meishin'},
-        'saturday': {'03001', '03001_Gion'},
-        'sunday': {'02001', '02001_Gion'}
+        "weekday": {
+            "01001",
+            "01001_Gion",
+            "01002_ritsumei",
+            "01003_sandai",
+            "01004_butsudai",
+            "01005_meishin",
+        },
+        "saturday": {"03001", "03001_Gion"},
+        "sunday": {"02001", "02001_Gion"},
     }
 
-    return base_patterns.get(day_type, {'01001'})
+    return base_patterns.get(day_type, {"01001"})
 
 
 def find_direct_routes(
@@ -232,7 +243,7 @@ def find_direct_routes(
     to_stop_ids: list[str],
     service_ids: set[str],
     current_time: str,
-    loader: GTFSDataLoader
+    loader: GTFSDataLoader,
 ) -> list[dict]:
     """
     直通便を検索するコアロジック
@@ -268,7 +279,7 @@ def find_direct_routes(
     for trip_id in candidate_trips:
         # service_idチェック
         trip_info = trips_data.get(trip_id)
-        if not trip_info or trip_info['service_id'] not in service_ids:
+        if not trip_info or trip_info["service_id"] not in service_ids:
             continue
 
         stops = trip_to_stops[trip_id]
@@ -278,27 +289,35 @@ def find_direct_routes(
         to_stop = None
 
         for stop in stops:
-            if stop['stop_id'] in from_stop_ids and from_stop is None:
+            if stop["stop_id"] in from_stop_ids and from_stop is None:
                 from_stop = stop
-            if stop['stop_id'] in to_stop_ids and to_stop is None:
+            if stop["stop_id"] in to_stop_ids and to_stop is None:
                 to_stop = stop
 
         # 両方見つかり、順序が正しいかチェック
-        if from_stop and to_stop and from_stop['stop_sequence'] < to_stop['stop_sequence']:
+        if (
+            from_stop
+            and to_stop
+            and from_stop["stop_sequence"] < to_stop["stop_sequence"]
+        ):
             # 現在時刻以降の便のみ
-            if from_stop['departure_time'] >= current_time:
-                results.append({
-                    'trip_id': trip_id,
-                    'from_stop_id': from_stop['stop_id'],
-                    'from_departure': from_stop['departure_time'],
-                    'to_stop_id': to_stop['stop_id'],
-                    'to_arrival': to_stop['arrival_time']
-                })
+            if from_stop["departure_time"] >= current_time:
+                results.append(
+                    {
+                        "trip_id": trip_id,
+                        "from_stop_id": from_stop["stop_id"],
+                        "from_departure": from_stop["departure_time"],
+                        "to_stop_id": to_stop["stop_id"],
+                        "to_arrival": to_stop["arrival_time"],
+                    }
+                )
 
     return results
 
 
-def search_similar_stop_names(query: str, stops_data: dict, limit: int = 5) -> list[str]:
+def search_similar_stop_names(
+    query: str, stops_data: dict, limit: int = 5
+) -> list[str]:
     """
     類似の停留所名を検索
 
@@ -319,7 +338,7 @@ def search_bus(
     from_stop_name: str,
     to_stop_name: str,
     current_time: Optional[str] = None,
-    day_type: str = 'weekday'
+    day_type: str = "weekday",
 ) -> list[dict]:
     """
     京都市バスの経路を検索する（直通のみ）
@@ -386,54 +405,53 @@ def search_bus(
     routes_data = loader.load_routes()
     trips_data = loader.load_trips()
 
-    from_stop_ids = [s['stop_id'] for s in from_stops]
-    to_stop_ids = [s['stop_id'] for s in to_stops]
+    from_stop_ids = [s["stop_id"] for s in from_stops]
+    to_stop_ids = [s["stop_id"] for s in to_stops]
 
     results = find_direct_routes(
         from_stop_ids=from_stop_ids,
         to_stop_ids=to_stop_ids,
         service_ids=service_ids,
         current_time=current_time,
-        loader=loader
+        loader=loader,
     )
 
     # 6. 結果の整形
     formatted_results = []
 
     for result in results:
-        trip_info = trips_data[result['trip_id']]
-        route_name = routes_data.get(trip_info['route_id'], trip_info['route_id'])
+        trip_info = trips_data[result["trip_id"]]
+        route_name = routes_data.get(trip_info["route_id"], trip_info["route_id"])
 
         # stop_descの取得
         from_stop_desc = next(
-            s['stop_desc'] for s in from_stops
-            if s['stop_id'] == result['from_stop_id']
+            s["stop_desc"] for s in from_stops if s["stop_id"] == result["from_stop_id"]
         )
         to_stop_desc = next(
-            s['stop_desc'] for s in to_stops
-            if s['stop_id'] == result['to_stop_id']
+            s["stop_desc"] for s in to_stops if s["stop_id"] == result["to_stop_id"]
         )
 
-        formatted_results.append({
-            'route_name': route_name,
-            'route_id': trip_info['route_id'],
-            'trip_id': result['trip_id'],
-            'headsign': trip_info['headsign'],
-            'departure_time': result['from_departure'],
-            'departure_stop_id': result['from_stop_id'],
-            'departure_stop_desc': from_stop_desc,
-            'arrival_time': result['to_arrival'],
-            'arrival_stop_id': result['to_stop_id'],
-            'arrival_stop_desc': to_stop_desc,
-            'travel_time_minutes': calculate_travel_time(
-                result['from_departure'],
-                result['to_arrival']
-            ),
-            'service_id': trip_info['service_id']
-        })
+        formatted_results.append(
+            {
+                "route_name": route_name,
+                "route_id": trip_info["route_id"],
+                "trip_id": result["trip_id"],
+                "headsign": trip_info["headsign"],
+                "departure_time": result["from_departure"],
+                "departure_stop_id": result["from_stop_id"],
+                "departure_stop_desc": from_stop_desc,
+                "arrival_time": result["to_arrival"],
+                "arrival_stop_id": result["to_stop_id"],
+                "arrival_stop_desc": to_stop_desc,
+                "travel_time_minutes": calculate_travel_time(
+                    result["from_departure"], result["to_arrival"]
+                ),
+                "service_id": trip_info["service_id"],
+            }
+        )
 
     # 7. 出発時刻でソート、上位3件
-    formatted_results.sort(key=lambda x: x['departure_time'])
+    formatted_results.sort(key=lambda x: x["departure_time"])
     return formatted_results[:3]
 
 
@@ -447,14 +465,18 @@ if __name__ == "__main__":
             from_stop_name="堀川下長者町",
             to_stop_name="京都駅前",
             current_time="11:49",
-            day_type="weekday"
+            day_type="weekday",
         )
 
         if results:
             for i, route in enumerate(results, 1):
                 print(f"\n{i}. {route['route_name']} ({route['headsign']})")
-                print(f"   出発: {route['departure_time']} - {route['departure_stop_desc']}")
-                print(f"   到着: {route['arrival_time']} - {route['arrival_stop_desc']}")
+                print(
+                    f"   出発: {route['departure_time']} - {route['departure_stop_desc']}"
+                )
+                print(
+                    f"   到着: {route['arrival_time']} - {route['arrival_stop_desc']}"
+                )
                 print(f"   所要時間: {route['travel_time_minutes']}分")
         else:
             print("\n該当する便が見つかりませんでした。")
