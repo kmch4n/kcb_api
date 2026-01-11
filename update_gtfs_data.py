@@ -42,17 +42,17 @@ def load_env_file(env_path: str) -> dict:
     if not os.path.exists(env_path):
         raise FileNotFoundError(f".envファイルが見つかりません: {env_path}")
 
-    with open(env_path, 'r', encoding='utf-8') as f:
+    with open(env_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
 
             # コメント行と空行をスキップ
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
             # KEY = VALUE 形式をパース
-            if '=' in line:
-                key, value = line.split('=', 1)
+            if "=" in line:
+                key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip()
 
@@ -84,10 +84,10 @@ def fetch_latest_date_from_web() -> str:
 
     try:
         with urllib.request.urlopen(ckan_url, timeout=30) as response:
-            html = response.read().decode('utf-8')
+            html = response.read().decode("utf-8")
 
         # date=YYYYMMDD パターンを検索
-        pattern = r'date=(\d{8})'
+        pattern = r"date=(\d{8})"
         matches = re.findall(pattern, html)
 
         if not matches:
@@ -142,7 +142,9 @@ def get_update_date(use_latest: bool = False) -> str:
     return user_input
 
 
-def download_gtfs_zip(url: str, api_key: str, date_param: str, output_path: str) -> None:
+def download_gtfs_zip(
+    url: str, api_key: str, date_param: str, output_path: str
+) -> None:
     """
     GTFSデータをダウンロード
 
@@ -156,10 +158,7 @@ def download_gtfs_zip(url: str, api_key: str, date_param: str, output_path: str)
         urllib.error.URLError: ダウンロード失敗
     """
     # URLにクエリパラメータを追加
-    params = {
-        'acl:consumerKey': api_key,
-        'date': date_param
-    }
+    params = {"acl:consumerKey": api_key, "date": date_param}
 
     query_string = urllib.parse.urlencode(params)
     full_url = f"{url}?{query_string}"
@@ -175,13 +174,13 @@ def download_gtfs_zip(url: str, api_key: str, date_param: str, output_path: str)
                 raise ValueError(f"HTTPエラー: {response.status}")
 
             # ファイルサイズ取得（進捗表示用）
-            total_size = int(response.headers.get('Content-Length', 0))
+            total_size = int(response.headers.get("Content-Length", 0))
 
             # チャンクでダウンロード
             chunk_size = 8192
             downloaded = 0
 
-            with open(output_path, 'wb') as f:
+            with open(output_path, "wb") as f:
                 while True:
                     chunk = response.read(chunk_size)
                     if not chunk:
@@ -193,7 +192,10 @@ def download_gtfs_zip(url: str, api_key: str, date_param: str, output_path: str)
                     # 進捗表示
                     if total_size > 0:
                         percent = (downloaded / total_size) * 100
-                        print(f"\r  進捗: {percent:.1f}% ({downloaded:,}/{total_size:,} bytes)", end='')
+                        print(
+                            f"\r  進捗: {percent:.1f}% ({downloaded:,}/{total_size:,} bytes)",
+                            end="",
+                        )
 
             print(f"\n  ✓ ダウンロード完了: {output_path}")
 
@@ -215,7 +217,7 @@ def extract_zip_to_data(zip_path: str, data_dir: str) -> None:
     print(f"  zipファイルを解凍中: {zip_path}")
 
     try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
             # zip内のファイル一覧を取得
             file_list = zip_ref.namelist()
 
@@ -235,7 +237,7 @@ def extract_zip_to_data(zip_path: str, data_dir: str) -> None:
 
                 # data/直下に書き込み
                 output_path = os.path.join(data_dir, base_name)
-                with open(output_path, 'wb') as f:
+                with open(output_path, "wb") as f:
                     f.write(file_data)
 
                 print(f"    ✓ {base_name}")
@@ -262,7 +264,7 @@ def backup_existing_data(data_dir: str, backup_dir: str) -> None:
     os.makedirs(backup_dir, exist_ok=True)
 
     # GTFSファイル一覧（拡張子で判定）
-    gtfs_extensions = ['.txt', '.zip']
+    gtfs_extensions = [".txt", ".zip"]
 
     backed_up_count = 0
     for file_name in os.listdir(data_dir):
@@ -289,10 +291,20 @@ def cleanup_old_gtfs_files(data_dir: str) -> None:
         data_dir: dataディレクトリ
     """
     gtfs_files = [
-        'agency.txt', 'calendar_dates.txt', 'calendar.txt',
-        'fare_attributes.txt', 'fare_rules.txt', 'feed_info.txt',
-        'frequencies.txt', 'routes.txt', 'shapes.txt', 'stops.txt',
-        'stop_times.txt', 'transfers.txt', 'translations.txt', 'trips.txt'
+        "agency.txt",
+        "calendar_dates.txt",
+        "calendar.txt",
+        "fare_attributes.txt",
+        "fare_rules.txt",
+        "feed_info.txt",
+        "frequencies.txt",
+        "routes.txt",
+        "shapes.txt",
+        "stops.txt",
+        "stop_times.txt",
+        "transfers.txt",
+        "translations.txt",
+        "trips.txt",
     ]
 
     deleted_count = 0
@@ -338,23 +350,23 @@ def collect_gtfs_statistics(data_dir: str) -> dict:
 
     # 各ファイルの行数をカウント
     gtfs_files = {
-        'stops.txt': '停留所数',
-        'routes.txt': '路線数',
-        'trips.txt': '運行便数',
-        'stop_times.txt': '時刻表レコード数',
-        'calendar.txt': '運行カレンダー数',
-        'calendar_dates.txt': 'カレンダー例外日数',
-        'fare_attributes.txt': '運賃属性数',
-        'fare_rules.txt': '運賃ルール数',
-        'transfers.txt': '乗換情報数',
-        'shapes.txt': '路線形状数',
-        'translations.txt': '翻訳情報数'
+        "stops.txt": "停留所数",
+        "routes.txt": "路線数",
+        "trips.txt": "運行便数",
+        "stop_times.txt": "時刻表レコード数",
+        "calendar.txt": "運行カレンダー数",
+        "calendar_dates.txt": "カレンダー例外日数",
+        "fare_attributes.txt": "運賃属性数",
+        "fare_rules.txt": "運賃ルール数",
+        "transfers.txt": "乗換情報数",
+        "shapes.txt": "路線形状数",
+        "translations.txt": "翻訳情報数",
     }
 
     for file_name, label in gtfs_files.items():
         file_path = os.path.join(data_dir, file_name)
         if os.path.exists(file_path):
-            with open(file_path, 'r', encoding='utf-8-sig') as f:
+            with open(file_path, "r", encoding="utf-8-sig") as f:
                 # ヘッダーを除いた行数
                 count = sum(1 for _ in f) - 1
                 stats[label] = count
@@ -362,22 +374,24 @@ def collect_gtfs_statistics(data_dir: str) -> dict:
             stats[label] = 0
 
     # feed_info.txtからメタ情報を取得
-    feed_info_path = os.path.join(data_dir, 'feed_info.txt')
+    feed_info_path = os.path.join(data_dir, "feed_info.txt")
     if os.path.exists(feed_info_path):
-        with open(feed_info_path, 'r', encoding='utf-8-sig') as f:
+        with open(feed_info_path, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                stats['feed_publisher'] = row.get('feed_publisher_name', '')
-                stats['feed_lang'] = row.get('feed_lang', '')
-                stats['feed_start_date'] = row.get('feed_start_date', '')
-                stats['feed_end_date'] = row.get('feed_end_date', '')
-                stats['feed_version'] = row.get('feed_version', '')
+                stats["feed_publisher"] = row.get("feed_publisher_name", "")
+                stats["feed_lang"] = row.get("feed_lang", "")
+                stats["feed_start_date"] = row.get("feed_start_date", "")
+                stats["feed_end_date"] = row.get("feed_end_date", "")
+                stats["feed_version"] = row.get("feed_version", "")
                 break
 
     return stats
 
 
-def write_detail_file(detail_path: str, stats: dict, date_param: str, timestamp: str) -> None:
+def write_detail_file(
+    detail_path: str, stats: dict, date_param: str, timestamp: str
+) -> None:
     """
     detail.txtに情報を記録
 
@@ -387,7 +401,7 @@ def write_detail_file(detail_path: str, stats: dict, date_param: str, timestamp:
         date_param: dateパラメータ
         timestamp: 取得日時
     """
-    with open(detail_path, 'w', encoding='utf-8') as f:
+    with open(detail_path, "w", encoding="utf-8") as f:
         f.write("=" * 80 + "\n")
         f.write("京都市バス GTFS データ更新情報\n")
         f.write("=" * 80 + "\n\n")
@@ -400,9 +414,19 @@ def write_detail_file(detail_path: str, stats: dict, date_param: str, timestamp:
         f.write("-" * 80 + "\n\n")
 
         # 統計情報を整形して出力
-        for key in ['停留所数', '路線数', '運行便数', '時刻表レコード数',
-                    '運行カレンダー数', 'カレンダー例外日数', '運賃属性数',
-                    '運賃ルール数', '乗換情報数', '路線形状数', '翻訳情報数']:
+        for key in [
+            "停留所数",
+            "路線数",
+            "運行便数",
+            "時刻表レコード数",
+            "運行カレンダー数",
+            "カレンダー例外日数",
+            "運賃属性数",
+            "運賃ルール数",
+            "乗換情報数",
+            "路線形状数",
+            "翻訳情報数",
+        ]:
             value = stats.get(key, 0)
             f.write(f"{key} : {value:,}\n")
 
@@ -413,8 +437,8 @@ def write_detail_file(detail_path: str, stats: dict, date_param: str, timestamp:
         f.write(f"発行者: {stats.get('feed_publisher', 'N/A')}\n")
         f.write(f"言語: {stats.get('feed_lang', 'N/A')}\n")
 
-        start = stats.get('feed_start_date', '')
-        end = stats.get('feed_end_date', '')
+        start = stats.get("feed_start_date", "")
+        end = stats.get("feed_end_date", "")
         if start and end:
             # YYYYMMDD → YYYY-MM-DD
             start_formatted = f"{start[:4]}-{start[4:6]}-{start[6:]}"
@@ -470,30 +494,27 @@ def regenerate_timetables_json_only(data_dir: str, timetable_dir: str) -> None:
 
     # 路線情報を読み込み
     routes = {}
-    with open(routes_file, 'r', encoding='utf-8-sig') as f:
+    with open(routes_file, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            routes[row['route_id']] = row['route_short_name']
+            routes[row["route_id"]] = row["route_short_name"]
 
     # 運行便情報を読み込み
     trips = {}
-    with open(trips_file, 'r', encoding='utf-8-sig') as f:
+    with open(trips_file, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            trips[row['trip_id']] = {
-                'route_id': row['route_id'],
-                'headsign': row['trip_headsign']
+            trips[row["trip_id"]] = {
+                "route_id": row["route_id"],
+                "headsign": row["trip_headsign"],
             }
 
     # バス停情報を読み込み
     stops = {}
-    with open(stops_file, 'r', encoding='utf-8-sig') as f:
+    with open(stops_file, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            stops[row['stop_id']] = {
-                'name': row['stop_name'],
-                'desc': row['stop_desc']
-            }
+            stops[row["stop_id"]] = {"name": row["stop_name"], "desc": row["stop_desc"]}
 
     # 各バス停の時刻表データを格納
     timetables = defaultdict(list)
@@ -501,26 +522,28 @@ def regenerate_timetables_json_only(data_dir: str, timetable_dir: str) -> None:
     # stop_times.txtから時刻を抽出
     print("  stop_times.txtを読み込み中...")
     count = 0
-    with open(stop_times_file, 'r', encoding='utf-8-sig') as f:
+    with open(stop_times_file, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
             count += 1
             if count % 100000 == 0:
                 print(f"    処理中: {count:,}行...")
 
-            stop_id = row['stop_id']
-            trip_id = row['trip_id']
+            stop_id = row["stop_id"]
+            trip_id = row["trip_id"]
 
             if trip_id in trips and stop_id in stops:
                 trip_info = trips[trip_id]
-                route_id = trip_info['route_id']
+                route_id = trip_info["route_id"]
                 route_name = routes.get(route_id, route_id)
 
-                timetables[stop_id].append({
-                    'time': row['arrival_time'],
-                    'route': route_name,
-                    'headsign': trip_info['headsign']
-                })
+                timetables[stop_id].append(
+                    {
+                        "time": row["arrival_time"],
+                        "route": route_name,
+                        "headsign": trip_info["headsign"],
+                    }
+                )
 
     print(f"  ✓ 総行数: {count:,}")
     print(f"  ✓ 時刻表データがあるバス停数: {len(timetables):,}")
@@ -531,24 +554,24 @@ def regenerate_timetables_json_only(data_dir: str, timetable_dir: str) -> None:
     generated_count = 0
     for stop_id, timetable_data in timetables.items():
         # 時刻でソート
-        timetable_data = sorted(timetable_data, key=lambda x: x['time'])
+        timetable_data = sorted(timetable_data, key=lambda x: x["time"])
 
-        stop_info = stops.get(stop_id, {'name': '不明', 'desc': ''})
-        stop_name = stop_info['name']
-        stop_desc = stop_info['desc']
+        stop_info = stops.get(stop_id, {"name": "不明", "desc": ""})
+        stop_name = stop_info["name"]
+        stop_desc = stop_info["desc"]
 
         # JSON形式で出力
         output_file = os.path.join(timetable_dir, f"{stop_id}.json")
 
         json_data = {
-            'stop_id': stop_id,
-            'stop_name': stop_name,
-            'stop_desc': stop_desc,
-            'total_trips': len(timetable_data),
-            'timetable': timetable_data
+            "stop_id": stop_id,
+            "stop_name": stop_name,
+            "stop_desc": stop_desc,
+            "total_trips": len(timetable_data),
+            "timetable": timetable_data,
         }
 
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(json_data, f, ensure_ascii=False, indent=2)
 
         generated_count += 1
@@ -563,19 +586,19 @@ def regenerate_timetables_json_only(data_dir: str, timetable_dir: str) -> None:
 def main() -> int:
     """メイン処理"""
     # コマンドライン引数のパース
-    parser = argparse.ArgumentParser(description='京都市バス GTFS データ更新ツール')
-    parser.add_argument('--date', type=str, help='取得日を手動指定 (YYYYMMDD形式)')
-    parser.add_argument('--manual', action='store_true', help='対話式で日付を入力')
+    parser = argparse.ArgumentParser(description="京都市バス GTFS データ更新ツール")
+    parser.add_argument("--date", type=str, help="取得日を手動指定 (YYYYMMDD形式)")
+    parser.add_argument("--manual", action="store_true", help="対話式で日付を入力")
     args = parser.parse_args()
 
     # パス設定
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_path = os.path.join(script_dir, '.env')
-    data_dir = os.path.join(script_dir, 'data')
-    backup_dir = os.path.join(script_dir, '.data_backup')
-    timetable_dir = os.path.join(script_dir, 'timetable')
-    temp_zip = os.path.join(script_dir, 'gtfs_temp.zip')
-    detail_path = os.path.join(data_dir, 'detail.txt')
+    env_path = os.path.join(script_dir, ".env")
+    data_dir = os.path.join(script_dir, "data")
+    backup_dir = os.path.join(script_dir, ".data_backup")
+    timetable_dir = os.path.join(script_dir, "timetable")
+    temp_zip = os.path.join(script_dir, "gtfs_temp.zip")
+    detail_path = os.path.join(data_dir, "detail.txt")
 
     try:
         print("=" * 80)
@@ -586,8 +609,8 @@ def main() -> int:
         # 1. .envファイル読み込み
         print("[1/9] .envファイルを読み込み中...")
         env_vars = load_env_file(env_path)
-        gtfs_url = env_vars.get('DEFAULT_GTFS_URL')
-        api_key = env_vars.get('ODPT_CONSUMER_KEY')
+        gtfs_url = env_vars.get("DEFAULT_GTFS_URL")
+        api_key = env_vars.get("ODPT_CONSUMER_KEY")
 
         if not gtfs_url or not api_key:
             raise ValueError(".envに必要な変数が定義されていません")
