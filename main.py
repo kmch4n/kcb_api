@@ -101,6 +101,7 @@ class ErrorResponse(BaseModel):
     success: bool = Field(False, description="常にFalse")
     error: str = Field(..., description="エラーメッセージ")
     detail: Optional[str] = Field(None, description="詳細情報")
+    status_code: Optional[int] = Field(None, description="HTTPステータスコード")
 
 
 class StopInfo(BaseModel):
@@ -595,8 +596,6 @@ async def get_trip_location(
     try:
         # 時刻の設定
         if time is None:
-            from datetime import datetime
-
             query_time = datetime.now().strftime("%H:%M:00")
         else:
             # HH:MM形式をHH:MM:SS形式に変換
@@ -657,8 +656,6 @@ async def get_trip_location(
 
                 # Calculate estimated arrival time in minutes
                 try:
-                    from datetime import datetime
-
                     query_dt = datetime.strptime(query_time, "%H:%M:%S")
                     arrival_dt = datetime.strptime(stop["arrival_time"], "%H:%M:%S")
                     diff = (arrival_dt - query_dt).total_seconds() / 60

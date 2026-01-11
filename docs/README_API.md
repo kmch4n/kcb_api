@@ -13,7 +13,7 @@ http://localhost:8000
 ## Authentication
 
 All endpoints (except Health Check) require an API Key.
-Included it in the request header `X-API-Key`.
+Include it in the request header `X-API-Key`.
 
 ```http
 X-API-Key: your_api_key_here
