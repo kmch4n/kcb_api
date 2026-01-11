@@ -7,7 +7,6 @@ FastAPI server for searching Kyoto City Bus routes using GTFS data.
 ### 1. Install Dependencies
 
 ```bash
-cd /home/your-username/dev/kcb_api
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -18,7 +17,7 @@ Copy `.env.example` to `.env` and configure:
 
 ```bash
 cp .env.example .env
-nano .env
+# Edit .env and set your API_KEY
 ```
 
 **Required Settings:**
@@ -74,8 +73,11 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
 
 All requests (except `/kcb_api/health`) require an API key in the `X-API-Key` header:
 
-```bash
-curl -H "X-API-Key: your-api-key-here" ...
+```python
+import requests
+
+headers = {"X-API-Key": "your-api-key-here"}
+response = requests.get(url, headers=headers)
 ```
 
 ### Endpoints
@@ -165,112 +167,55 @@ POST /kcb_api/search
 }
 ```
 
-### Example cURL Commands
+### Example Python Code
 
-```bash
+```python
+import requests
+
+BASE_URL = "http://localhost:8000"
+API_KEY = "your-api-key-here"
+
 # Basic search (weekday, current time)
-curl -X POST "http://localhost:8000/kcb_api/search" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
+url = f"{BASE_URL}/kcb_api/search"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": API_KEY
+}
+data = {
     "from_stop": "四条河原町",
     "to_stop": "京都駅前"
-  }'
+}
+
+response = requests.post(url, json=data, headers=headers)
+print(response.json())
 
 # Search with specific time
-curl -X POST "http://localhost:8000/kcb_api/search" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
+data = {
     "from_stop": "堀川下長者町",
     "to_stop": "京都駅前",
     "current_time": "14:30",
     "day_type": "weekday",
     "limit": 5
-  }'
+}
+
+response = requests.post(url, json=data, headers=headers)
+print(response.json())
 
 # Sunday search
-curl -X POST "http://localhost:8000/kcb_api/search" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
+data = {
     "from_stop": "京都駅前",
     "to_stop": "金閣寺道",
     "current_time": "09:00",
     "day_type": "sunday"
-  }'
-```
-
-## Deployment
-
-### Using systemd
-
-1. Create systemd service file:
-
-```bash
-sudo nano /etc/systemd/system/kcb_api.service
-```
-
-```ini
-[Unit]
-Description=Kyoto City Bus API
-After=network.target
-
-[Service]
-Type=simple
-User=your-username
-WorkingDirectory=/home/your-username/dev/kcb_api
-Environment="PATH=/home/your-username/dev/kcb_api/.venv/bin"
-EnvironmentFile=/home/your-username/dev/kcb_api/.env
-ExecStart=/home/your-username/dev/kcb_api/.venv/bin/python main.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-2. Enable and start service:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable kcb_api
-sudo systemctl start kcb_api
-sudo systemctl status kcb_api
-```
-
-### Nginx Reverse Proxy
-
-For `api.example.com` domain:
-
-```nginx
-server {
-    listen 80;
-    server_name api.example.com;
-
-    location /kcb_api {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
 }
+
+response = requests.post(url, json=data, headers=headers)
+print(response.json())
 ```
 
-Apply configuration:
+## Running the Server
 
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Cloudflare SSL
-
-Cloudflare handles HTTPS termination, so the nginx configuration uses HTTP (port 80). Ensure:
-
-1. DNS record for `api.example.com` points to your server
-2. Cloudflare SSL/TLS mode is set to "Full" or "Flexible"
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on running the server.
 
 ## Interactive API Documentation
 
@@ -279,20 +224,6 @@ Once the server is running, visit:
 -   Swagger UI: http://localhost:8000/kcb_api/docs
 -   ReDoc: http://localhost:8000/kcb_api/redoc
 
-## Logs
-
-Check logs when running as systemd service:
-
-```bash
-sudo journalctl -u kcb_api -f
-```
-
 ## Stopping the Server
 
-```bash
-# If running in terminal
-Ctrl+C
-
-# If running as systemd service
-sudo systemctl stop kcb_api
-```
+Press `Ctrl+C` in the terminal where the server is running.

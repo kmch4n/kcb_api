@@ -49,22 +49,33 @@ The server will start on `http://localhost:8000`
 
 ### Health Check
 
-```bash
-curl http://localhost:8000/kcb_api/health
+```python
+import requests
+
+response = requests.get("http://localhost:8000/kcb_api/health")
+print(response.json())
+# {"status": "healthy", "timestamp": "2026-01-11T12:15:00"}
 ```
 
 ### Search Bus Routes
 
-```bash
-curl -X POST http://localhost:8000/kcb_api/search \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
+```python
+import requests
+
+url = "http://localhost:8000/kcb_api/search"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "your-api-key-here"
+}
+data = {
     "from_stop": "京都駅前",
     "to_stop": "四条河原町",
     "current_time": "14:00",
     "day_type": "weekday"
-  }'
+}
+
+response = requests.post(url, json=data, headers=headers)
+print(response.json())
 ```
 
 **Parameters:**
