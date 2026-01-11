@@ -54,7 +54,7 @@ Search for bus stops by name (partial match).
 
 | Name    | Type    | Required | Description                     |
 | ------- | ------- | -------- | ------------------------------- |
-| `q`     | string  | Yes      | Search query (e.g., "Kyoto")    |
+| `q`     | string  | Yes      | Search query (e.g., "京都")     |
 | `limit` | integer | No       | Max results (1-50, default: 10) |
 
 #### Response
@@ -102,7 +102,7 @@ Find stops within a specified radius of GPS coordinates.
     "stops": [
         {
             "stop_id": "012345",
-            "stop_name": "Nearby Stop A",
+            "stop_name": "京都駅八条口",
             "stop_desc": "Northbound",
             "stop_lat": 35.001,
             "stop_lon": 135.701,
@@ -126,8 +126,8 @@ Find direct bus routes between two stops.
 
 ```json
 {
-    "from_stop": "Kyoto Station",
-    "to_stop": "Kinkakuji",
+    "from_stop": "京都駅前",
+    "to_stop": "金閣寺道",
     "current_time": "09:00",
     "day_type": "weekday",
     "limit": 3
@@ -146,7 +146,7 @@ _Note: `day_type` can be `weekday`, `saturday`, or `sunday`._
         {
             "route_name": "205",
             "trip_id": "205_weekday_123",
-            "headsign": "Kinkakuji / Kitaoji",
+            "headsign": "金閣寺道 / 北大路バスターミナル",
             "departure_time": "09:05:00",
             "departure_stop_desc": "B3",
             "arrival_time": "09:45:00",
@@ -181,14 +181,14 @@ Get the schedule for a specific stop.
 {
     "success": true,
     "stop_id": "061211",
-    "stop_name": "Kyoto Station",
+    "stop_name": "京都駅前",
     "count": 50,
     "timetable": [
         {
             "departure_time": "09:00:00",
             "route_name": "205",
             "route_id": "00205",
-            "headsign": "Kinkakuji",
+            "headsign": "金閣寺道",
             "trip_id": "TRIP_123",
             "service_id": "weekday_01"
         }
@@ -220,15 +220,15 @@ Estimate the current location of a specific bus trip based on the timetable.
     "trip_id": "TRIP_123",
     "query_time": "09:20:00",
     "status": "between_stops",
-    "message": "Left Stop A → Heading to Stop B",
+    "message": "河原町五条を出発 → 四条河原町に向かっています",
     "from_stop": {
         "stop_id": "STOP_A",
-        "stop_name": "Stop A",
+        "stop_name": "河原町五条",
         "time": "09:18:00"
     },
     "to_stop": {
         "stop_id": "STOP_B",
-        "stop_name": "Stop B",
+        "stop_name": "四条河原町",
         "time": "09:22:00"
     },
     "estimated_arrival_minutes": 2
