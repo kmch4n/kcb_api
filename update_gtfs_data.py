@@ -77,7 +77,10 @@ def fetch_latest_date_from_web() -> str:
     Raises:
         Exception: ページ取得または日付抽出に失敗
     """
-    ckan_url = "https://ckan.odpt.org/dataset/kyoto_municipal_transportation_kyoto_city_bus_gtfs/resource/d9ce405a-139d-48f1-89bd-58129f6ff93c"
+    ckan_url = os.getenv(
+        "CKAN_RESOURCE_URL",
+        "https://ckan.odpt.org/dataset/kyoto_municipal_transportation_kyoto_city_bus_gtfs/resource/d9ce405a-139d-48f1-89bd-58129f6ff93c"
+    )
 
     print(f"  公共交通オープンデータから最新日付を取得中...")
     print(f"  URL: {ckan_url}")

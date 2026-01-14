@@ -200,7 +200,10 @@ class GTFSDataLoader:
                 ...
             }
         """
-        if self._fare_attributes_cache is not None and self._fare_rules_cache is not None:
+        if (
+            self._fare_attributes_cache is not None
+            and self._fare_rules_cache is not None
+        ):
             return self._fare_rules_cache
 
         # 1. fare_attributes.txtを読み込み（fare_id → price）
@@ -256,31 +259,47 @@ def calculate_travel_time(departure_time: str, arrival_time: str) -> int:
     return arr_minutes - dep_minutes
 
 
-def determine_service_ids(day_type: str) -> set[str]:
+def determine_service_ids(day_type: str, loader: GTFSDataLoader = None) -> set[str]:
     """
-    運行日タイプから有効なservice_idセットを返す
+    運行日タイプから有効なservice_idセットを返す（calendar.txtを動的に参照）
 
     Args:
         day_type: 'weekday', 'saturday', 'sunday'
+        loader: GTFSDataLoaderインスタンス（Noneの場合は新規取得）
 
     Returns:
         有効なservice_idのセット
     """
-    # 基本的な運行パターン
-    base_patterns = {
-        "weekday": {
-            "01001",
-            "01001_Gion",
-            "01002_ritsumei",
-            "01003_sandai",
-            "01004_butsudai",
-            "01005_meishin",
-        },
-        "saturday": {"03001", "03001_Gion"},
-        "sunday": {"02001", "02001_Gion"},
-    }
+    if loader is None:
+        loader = GTFSDataLoader.get_instance()
 
-    return base_patterns.get(day_type, {"01001"})
+    calendar_data = loader.load_calendar()
+    service_ids = set()
+
+    # day_typeに応じた曜日フィールドを決定
+    if day_type == "weekday":
+        # 平日: 月-金のいずれかで運行し、土日に運行しないサービス
+        weekday_fields = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        for service_id, calendar_entry in calendar_data.items():
+            if any(calendar_entry.get(day, "0") == "1" for day in weekday_fields):
+                # 土日に運行していない場合のみ平日サービスとみなす
+                if (
+                    calendar_entry.get("saturday", "0") == "0"
+                    and calendar_entry.get("sunday", "0") == "0"
+                ):
+                    service_ids.add(service_id)
+    elif day_type == "saturday":
+        # 土曜日運行のサービス
+        for service_id, calendar_entry in calendar_data.items():
+            if calendar_entry.get("saturday", "0") == "1":
+                service_ids.add(service_id)
+    elif day_type == "sunday":
+        # 日曜日運行のサービス
+        for service_id, calendar_entry in calendar_data.items():
+            if calendar_entry.get("sunday", "0") == "1":
+                service_ids.add(service_id)
+
+    return service_ids if service_ids else set()
 
 
 def find_direct_routes(
@@ -441,9 +460,18 @@ def search_bus(
         now = datetime.now()
         current_time = now.strftime("%H:%M")
 
-    # current_timeを"HH:MM:SS"形式に変換
-    if len(current_time) == 5:  # "HH:MM"
-        current_time = current_time + ":00"
+    # current_timeを"HH:MM:SS"形式に変換（単一桁時間対応）
+    if ":" in current_time:
+        parts = current_time.split(":")
+        if len(parts) == 2:  # "H:MM" or "HH:MM"
+            hour = parts[0].zfill(2)  # 左側を0埋め
+            minute = parts[1]
+            current_time = f"{hour}:{minute}:00"
+        elif len(parts) == 3:  # "H:MM:SS" or "HH:MM:SS"
+            hour = parts[0].zfill(2)
+            minute = parts[1]
+            second = parts[2]
+            current_time = f"{hour}:{minute}:{second}"
 
     # 4. 運行日パターンの決定
     service_ids = determine_service_ids(day_type)
@@ -507,9 +535,9 @@ def search_bus(
             }
         )
 
-    # 7. 出発時刻でソート、上位3件
+    # 7. 出発時刻でソート（limitは呼び出し側で適用）
     formatted_results.sort(key=lambda x: x["departure_time"])
-    return formatted_results[:3]
+    return formatted_results
 
 
 if __name__ == "__main__":

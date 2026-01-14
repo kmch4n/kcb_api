@@ -1,10 +1,27 @@
 import requests
 import sys
 import time
+import os
 from datetime import datetime
+from pathlib import Path
+
+# Add parent directory to path for .env loading
+sys.path.insert(0, str(Path(__file__).parent))
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
 
 BASE_URL = "http://localhost:8000/kcb_api"
-API_KEY = "***REMOVED***"
+API_KEY = os.getenv("API_KEY")
+
+if not API_KEY:
+    print("ERROR: API_KEY not found in environment variables or .env file")
+    print("Please set API_KEY in .env file or as environment variable")
+    sys.exit(1)
 
 
 def verify_feature_5():

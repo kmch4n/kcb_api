@@ -516,7 +516,13 @@ async def get_nearby_stops(
         # Calculate bounding box for optimization (rough filter)
         # 1 degree latitude ≈ 111km
         lat_delta = (radius / 111000) * 1.5  # Add margin
-        lon_delta = (radius / (111000 * math.cos(math.radians(lat)))) * 1.5
+
+        # 極座標付近でのゼロ除算を防ぐ
+        if abs(lat) > 89:
+            # 極点付近では経度の変化が小さいため、大きめのマージンを設定
+            lon_delta = 180  # 全経度を含む
+        else:
+            lon_delta = (radius / (111000 * math.cos(math.radians(lat)))) * 1.5
 
         # Collect nearby stops with distances
         nearby_stops = []
@@ -594,7 +600,7 @@ async def get_trip_location(
     trip_id: str,
     time: Optional[str] = None,
     departure_stop_id: Optional[str] = None,
-    api_key: str = Depends(verify_api_key)
+    api_key: str = Depends(verify_api_key),
 ):
     """
     バスの推定位置を取得（時刻表ベース）
