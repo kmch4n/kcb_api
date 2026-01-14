@@ -5,9 +5,11 @@ FastAPI server for searching Kyoto City Bus routes using GTFS (General Transit F
 ## Features
 
 -   🚌 **Bus Route Search**: Find direct routes between two stops with departure times.
+-   💰 **Fare Information**: Get fare prices and stop counts for each route.
 -   📍 **Nearby Stops**: Find bus stops near your GPS location.
 -   🕒 **Timetable**: View schedules for specific stops.
 -   👁️ **Bus Location**: Estimate bus current location based on schedule.
+-   🚏 **Boarding Assistance**: Track the 3 stops before your boarding location.
 -   ⚡ **Fast Response**: GTFS data preloaded in memory.
 -   📖 **Full Documentation**: [See API Documentation](docs/README_API.md).
 

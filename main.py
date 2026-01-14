@@ -83,6 +83,8 @@ class BusRoute(BaseModel):
     arrival_stop_id: str = Field(..., description="到着停留所ID")
     arrival_stop_desc: str = Field(..., description="到着停留所詳細")
     travel_time_minutes: int = Field(..., description="所要時間（分）")
+    stops_count: int = Field(..., description="停車駅数（出発地・目的地を含む）")
+    fare: Optional[int] = Field(None, description="運賃（円）")
     service_id: str = Field(..., description="運行サービスID")
 
 
@@ -183,6 +185,12 @@ class TripLocationResponse(BaseModel):
     to_stop: Optional[StopLocation] = Field(None, description="直後の停留所")
     estimated_arrival_minutes: Optional[int] = Field(
         None, description="次停留所までの推定時間(分)"
+    )
+    previous_stops: Optional[List[StopLocation]] = Field(
+        None, description="乗車予定バス停の前3つの停留所（順番通り）"
+    )
+    boarding_stop: Optional[StopLocation] = Field(
+        None, description="ユーザーの乗車予定バス停"
     )
 
 
@@ -583,13 +591,17 @@ async def get_nearby_stops(
     },
 )
 async def get_trip_location(
-    trip_id: str, time: Optional[str] = None, api_key: str = Depends(verify_api_key)
+    trip_id: str,
+    time: Optional[str] = None,
+    departure_stop_id: Optional[str] = None,
+    api_key: str = Depends(verify_api_key)
 ):
     """
     バスの推定位置を取得（時刻表ベース）
 
     - **trip_id**: 便ID（検索結果から取得）
     - **time**: 確認したい時刻（HH:MM形式、省略時は現在時刻）
+    - **departure_stop_id**: ユーザーの乗車予定バス停ID（指定すると前3つの停留所情報も返す）
 
     注意: ダイヤ通りに運行している前提での推定です。実際の位置とは異なる場合があります。
     """
@@ -630,6 +642,37 @@ async def get_trip_location(
                     return name
             return stop_id
 
+        # 乗車予定バス停の前3つの停留所を取得（departure_stop_id指定時）
+        previous_stops_list = None
+        boarding_stop_info = None
+
+        if departure_stop_id:
+            # 乗車予定バス停のインデックスを探す
+            boarding_index = None
+            for idx, stop in enumerate(stops):
+                if stop["stop_id"] == departure_stop_id:
+                    boarding_index = idx
+                    boarding_stop_info = StopLocation(
+                        stop_id=stop["stop_id"],
+                        stop_name=get_stop_name(stop["stop_id"]),
+                        time=stop["departure_time"],
+                    )
+                    break
+
+            # 前3つの停留所を取得
+            if boarding_index is not None and boarding_index > 0:
+                previous_stops_list = []
+                start_idx = max(0, boarding_index - 3)
+                for idx in range(start_idx, boarding_index):
+                    prev_stop = stops[idx]
+                    previous_stops_list.append(
+                        StopLocation(
+                            stop_id=prev_stop["stop_id"],
+                            stop_name=get_stop_name(prev_stop["stop_id"]),
+                            time=prev_stop["departure_time"],
+                        )
+                    )
+
         # Estimate current location
         for i, stop in enumerate(stops):
             departure_time = stop["departure_time"]
@@ -649,6 +692,8 @@ async def get_trip_location(
                             stop_name=get_stop_name(stop["stop_id"]),
                             time=departure_time,
                         ),
+                        previous_stops=previous_stops_list,
+                        boarding_stop=boarding_stop_info,
                     )
 
                 # Between previous stop and this stop
@@ -680,6 +725,8 @@ async def get_trip_location(
                         time=stop["arrival_time"],
                     ),
                     estimated_arrival_minutes=estimated_minutes,
+                    previous_stops=previous_stops_list,
+                    boarding_stop=boarding_stop_info,
                 )
 
         # Arrived at final destination
@@ -695,6 +742,8 @@ async def get_trip_location(
                 stop_name=get_stop_name(last_stop["stop_id"]),
                 time=last_stop["departure_time"],
             ),
+            previous_stops=previous_stops_list,
+            boarding_stop=boarding_stop_info,
         )
 
     except HTTPException:

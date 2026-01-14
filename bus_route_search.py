@@ -17,6 +17,8 @@ class GTFSDataLoader:
         self._trips_cache = None
         self._stop_times_cache = None
         self._calendar_cache = None
+        self._fare_attributes_cache = None
+        self._fare_rules_cache = None
 
     @classmethod
     def get_instance(cls, gtfs_dir: str = None):
@@ -188,6 +190,49 @@ class GTFSDataLoader:
         self._calendar_cache = calendar
         return self._calendar_cache
 
+    def load_fares(self) -> dict:
+        """
+        fare_attributes.txtとfare_rules.txtを読み込み、route_id → fare情報のマッピングを返す
+
+        Returns:
+            {
+                "00100": {"fare_id": "F_230", "price": 230, "currency": "JPY"},
+                ...
+            }
+        """
+        if self._fare_attributes_cache is not None and self._fare_rules_cache is not None:
+            return self._fare_rules_cache
+
+        # 1. fare_attributes.txtを読み込み（fare_id → price）
+        fare_attributes_file = os.path.join(self.gtfs_dir, "fare_attributes.txt")
+        fare_attributes = {}
+
+        with open(fare_attributes_file, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                fare_attributes[row["fare_id"]] = {
+                    "fare_id": row["fare_id"],
+                    "price": int(row["price"]),
+                    "currency": row["currency_type"],
+                }
+
+        self._fare_attributes_cache = fare_attributes
+
+        # 2. fare_rules.txtを読み込み（route_id → fare_id）
+        fare_rules_file = os.path.join(self.gtfs_dir, "fare_rules.txt")
+        route_to_fare = {}
+
+        with open(fare_rules_file, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                route_id = row["route_id"]
+                fare_id = row["fare_id"]
+                if route_id not in route_to_fare and fare_id in fare_attributes:
+                    route_to_fare[route_id] = fare_attributes[fare_id]
+
+        self._fare_rules_cache = route_to_fare
+        return self._fare_rules_cache
+
 
 def calculate_travel_time(departure_time: str, arrival_time: str) -> int:
     """
@@ -307,8 +352,10 @@ def find_direct_routes(
                         "trip_id": trip_id,
                         "from_stop_id": from_stop["stop_id"],
                         "from_departure": from_stop["departure_time"],
+                        "from_stop_sequence": from_stop["stop_sequence"],
                         "to_stop_id": to_stop["stop_id"],
                         "to_arrival": to_stop["arrival_time"],
+                        "to_stop_sequence": to_stop["stop_sequence"],
                     }
                 )
 
@@ -404,6 +451,7 @@ def search_bus(
     # 5. 直通便の検索
     routes_data = loader.load_routes()
     trips_data = loader.load_trips()
+    fares_data = loader.load_fares()
 
     from_stop_ids = [s["stop_id"] for s in from_stops]
     to_stop_ids = [s["stop_id"] for s in to_stops]
@@ -431,6 +479,13 @@ def search_bus(
             s["stop_desc"] for s in to_stops if s["stop_id"] == result["to_stop_id"]
         )
 
+        # 停車駅数を計算（出発地と目的地を含む）
+        stops_count = result["to_stop_sequence"] - result["from_stop_sequence"] + 1
+
+        # 運賃情報を取得
+        fare_info = fares_data.get(trip_info["route_id"])
+        fare = fare_info["price"] if fare_info else None
+
         formatted_results.append(
             {
                 "route_name": route_name,
@@ -446,6 +501,8 @@ def search_bus(
                 "travel_time_minutes": calculate_travel_time(
                     result["from_departure"], result["to_arrival"]
                 ),
+                "stops_count": stops_count,
+                "fare": fare,
                 "service_id": trip_info["service_id"],
             }
         )

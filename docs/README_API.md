@@ -152,11 +152,18 @@ _Note: `day_type` can be `weekday`, `saturday`, or `sunday`._
             "arrival_time": "09:45:00",
             "arrival_stop_desc": "Main",
             "travel_time_minutes": 40,
+            "stops_count": 12,
+            "fare": 230,
             "service_id": "weekday_01"
         }
     ]
 }
 ```
+
+**New Fields:**
+
+-   `stops_count`: Number of stops from departure to arrival (including both).
+-   `fare`: Bus fare in Japanese Yen (JPY). Returns `null` if fare information is unavailable.
 
 ---
 
@@ -208,9 +215,10 @@ Estimate the current location of a specific bus trip based on the timetable.
 
 #### Parameters
 
-| Name   | Type   | Required | Description                                                       |
-| ------ | ------ | -------- | ----------------------------------------------------------------- |
-| `time` | string | No       | Reference time (HH:MM or HH:MM:SS). Default: current server time. |
+| Name                | Type   | Required | Description                                                                       |
+| ------------------- | ------ | -------- | --------------------------------------------------------------------------------- |
+| `time`              | string | No       | Reference time (HH:MM or HH:MM:SS). Default: current server time.                 |
+| `departure_stop_id` | string | No       | Your boarding stop ID. If provided, returns the previous 3 stops before boarding. |
 
 #### Response
 
@@ -231,9 +239,36 @@ Estimate the current location of a specific bus trip based on the timetable.
         "stop_name": "四条河原町",
         "time": "09:22:00"
     },
-    "estimated_arrival_minutes": 2
+    "estimated_arrival_minutes": 2,
+    "previous_stops": [
+        {
+            "stop_id": "STOP_X",
+            "stop_name": "祇園",
+            "time": "09:10:00"
+        },
+        {
+            "stop_id": "STOP_Y",
+            "stop_name": "清水道",
+            "time": "09:13:00"
+        },
+        {
+            "stop_id": "STOP_Z",
+            "stop_name": "東山三条",
+            "time": "09:16:00"
+        }
+    ],
+    "boarding_stop": {
+        "stop_id": "STOP_BOARD",
+        "stop_name": "四条大宮",
+        "time": "09:25:00"
+    }
 }
 ```
+
+**New Fields (when `departure_stop_id` is provided):**
+
+-   `previous_stops`: List of up to 3 stops before your boarding stop (in order).
+-   `boarding_stop`: Your boarding stop information.
 
 **Status Values:**
 
