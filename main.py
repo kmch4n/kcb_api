@@ -9,11 +9,17 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 import math
 from datetime import datetime
+import re
 import logging
 
 from config import settings
 from auth import verify_api_key
-from bus_route_search import search_bus, GTFSDataLoader, search_similar_stop_names
+from bus_route_search import (
+    search_bus,
+    GTFSDataLoader,
+    search_similar_stop_names,
+    parse_gtfs_time,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -612,13 +618,45 @@ async def get_trip_location(
     注意: ダイヤ通りに運行している前提での推定です。実際の位置とは異なる場合があります。
     """
     try:
-        # 時刻の設定
+        # 時刻の設定とバリデーション
         if time is None:
             query_time = datetime.now().strftime("%H:%M:00")
         else:
-            # HH:MM形式をHH:MM:SS形式に変換
-            if len(time) == 5:
-                query_time = time + ":00"
+            # 時刻フォーマットのバリデーション
+            if not re.match(r"^[0-9]{1,2}:[0-5][0-9](:[0-5][0-9])?$", time):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="time must be in HH:MM or HH:MM:SS format (e.g., '9:30' or '09:30:00')",
+                )
+
+            # 時間の範囲チェック（GTFS対応で30時まで許可）
+            try:
+                hours = int(time.split(":")[0])
+                if hours > 30:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="hour must be between 0 and 30 for GTFS compatibility",
+                    )
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid time format",
+                )
+
+            # 時刻を「HH:MM:SS」形式に正規化（単一桁時間対応）
+            if ":" in time:
+                parts = time.split(":")
+                if len(parts) == 2:  # "H:MM" or "HH:MM"
+                    hour = parts[0].zfill(2)
+                    minute = parts[1]
+                    query_time = f"{hour}:{minute}:00"
+                elif len(parts) == 3:  # "H:MM:SS" or "HH:MM:SS"
+                    hour = parts[0].zfill(2)
+                    minute = parts[1]
+                    second = parts[2]
+                    query_time = f"{hour}:{minute}:{second}"
+                else:
+                    query_time = time
             else:
                 query_time = time
 
@@ -707,9 +745,9 @@ async def get_trip_location(
 
                 # Calculate estimated arrival time in minutes
                 try:
-                    query_dt = datetime.strptime(query_time, "%H:%M:%S")
-                    arrival_dt = datetime.strptime(stop["arrival_time"], "%H:%M:%S")
-                    diff = (arrival_dt - query_dt).total_seconds() / 60
+                    query_minutes = parse_gtfs_time(query_time)
+                    arrival_minutes = parse_gtfs_time(stop["arrival_time"])
+                    diff = arrival_minutes - query_minutes
                     estimated_minutes = int(diff) if diff > 0 else 0
                 except:
                     estimated_minutes = None

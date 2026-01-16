@@ -237,23 +237,31 @@ class GTFSDataLoader:
         return self._fare_rules_cache
 
 
+def parse_gtfs_time(time_str: str) -> int:
+    """
+    GTFS時刻文字列（HH:MM:SS）を分単位に変換
+    
+    Args:
+        time_str: GTFS時刻文字列（例: "14:30:00" or "25:30:00"）
+    
+    Returns:
+        深夜0時からの経過分数
+    """
+    h, m, s = map(int, time_str.split(":"))
+    return h * 60 + m
+
+
 def calculate_travel_time(departure_time: str, arrival_time: str) -> int:
     """
     所要時間を分単位で計算
-
+    
     Args:
         departure_time: "HH:MM:SS"形式（24時以降も可、例: "25:30:00"）
         arrival_time: "HH:MM:SS"形式
-
+    
     Returns:
         所要時間（分）
     """
-
-    def parse_gtfs_time(time_str: str) -> int:
-        """HH:MM:SSを分に変換（24時以降対応）"""
-        h, m, s = map(int, time_str.split(":"))
-        return h * 60 + m
-
     dep_minutes = parse_gtfs_time(departure_time)
     arr_minutes = parse_gtfs_time(arrival_time)
     return arr_minutes - dep_minutes
@@ -278,16 +286,11 @@ def determine_service_ids(day_type: str, loader: GTFSDataLoader = None) -> set[s
 
     # day_typeに応じた曜日フィールドを決定
     if day_type == "weekday":
-        # 平日: 月-金のいずれかで運行し、土日に運行しないサービス
+        # 平日: 月-金のいずれかで運行するサービスをすべて含める
         weekday_fields = ["monday", "tuesday", "wednesday", "thursday", "friday"]
         for service_id, calendar_entry in calendar_data.items():
             if any(calendar_entry.get(day, "0") == "1" for day in weekday_fields):
-                # 土日に運行していない場合のみ平日サービスとみなす
-                if (
-                    calendar_entry.get("saturday", "0") == "0"
-                    and calendar_entry.get("sunday", "0") == "0"
-                ):
-                    service_ids.add(service_id)
+                service_ids.add(service_id)
     elif day_type == "saturday":
         # 土曜日運行のサービス
         for service_id, calendar_entry in calendar_data.items():
