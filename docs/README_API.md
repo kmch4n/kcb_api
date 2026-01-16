@@ -276,6 +276,23 @@ Estimate the current location of a specific bus trip based on the timetable.
 -   `between_stops`: Bus is in transit.
 -   `arrived`: Bus has reached the final destination.
 
+**Error Responses:**
+
+-   **400 Bad Request** - Invalid time format:
+
+    ```json
+    {
+        "detail": "time must be in HH:MM or HH:MM:SS format (e.g., '9:30' or '09:30:00')"
+    }
+    ```
+
+-   **400 Bad Request** - Hour out of range:
+    ```json
+    {
+        "detail": "hour must be between 0 and 30 for GTFS compatibility"
+    }
+    ```
+
 ---
 
 ## Python Client Examples
