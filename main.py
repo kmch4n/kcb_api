@@ -62,12 +62,13 @@ class SearchRequest(BaseModel):
         None, description="出発時刻 (HH:MM形式)", pattern=r"^\d{1,2}:\d{2}$"
     )
     day_type: str = Field(
-        "weekday", description="運行日タイプ (weekday/saturday/sunday)。dateが指定された場合は無視されます。"
+        "weekday",
+        description="運行日タイプ (weekday/saturday/sunday)。dateが指定された場合は無視されます。",
     )
     date: Optional[str] = Field(
         None,
         description="検索日（YYYY-MM-DD形式）。祝日・特別ダイヤを考慮します。指定時はday_typeより優先されます。",
-        pattern=r"^\d{4}-\d{2}-\d{2}$"
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
     )
     limit: int = Field(3, description="最大結果件数", ge=1, le=10)
 
@@ -829,7 +830,9 @@ async def search_routes(request: SearchRequest, api_key: str = Depends(verify_ap
     - **limit**: 最大結果件数（1-10、デフォルト3）
     """
     try:
-        logger.info(f"Search request: {request.from_stop} -> {request.to_stop}, date={request.date}")
+        logger.info(
+            f"Search request: {request.from_stop} -> {request.to_stop}, date={request.date}"
+        )
 
         # Call search function with date support
         results = search_bus(
