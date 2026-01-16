@@ -160,12 +160,15 @@ class TimetableResponse(BaseModel):
 class NearbyStopInfo(BaseModel):
     """周辺停留所情報"""
 
-    stop_id: str = Field(..., description="停留所ID")
+    stop_id: str = Field(..., description="代表停留所ID（最も近いプラットフォーム）")
+    stop_ids: List[str] = Field(..., description="同じ停留所名に属するすべての停留所ID")
     stop_name: str = Field(..., description="停留所名")
-    stop_desc: str = Field(..., description="停留所説明")
-    stop_lat: float = Field(..., description="緯度")
-    stop_lon: float = Field(..., description="経度")
-    distance_meters: float = Field(..., description="距離（メートル）")
+    stop_desc: str = Field(..., description="停留所説明（最も近いプラットフォーム）")
+    stop_lat: float = Field(..., description="緯度（最も近いプラットフォーム）")
+    stop_lon: float = Field(..., description="経度（最も近いプラットフォーム）")
+    distance_meters: float = Field(
+        ..., description="距離（メートル、最も近いプラットフォームまで）"
+    )
 
 
 class NearbyStopsResponse(BaseModel):
@@ -536,9 +539,9 @@ async def get_nearby_stops(
         else:
             lon_delta = (radius / (111000 * math.cos(math.radians(lat)))) * 1.5
 
-        # Collect nearby stops with distances
-        nearby_stops = []
-        processed_locations = set()  # Track unique locations
+        # Collect nearby stops grouped by stop_name
+        # Key: stop_name, Value: dict with best (nearest) stop info and all stop_ids
+        stops_by_name: dict = {}
 
         for stop_name, stop_list in stops_data.items():
             for stop in stop_list:
@@ -557,22 +560,32 @@ async def get_nearby_stops(
 
                 # Filter by radius
                 if distance <= radius:
-                    # Create unique location key
-                    location_key = (stop_lat, stop_lon)
+                    if stop_name not in stops_by_name:
+                        # First stop with this name
+                        stops_by_name[stop_name] = {
+                            "stop_id": stop["stop_id"],
+                            "stop_ids": [stop["stop_id"]],
+                            "stop_name": stop_name,
+                            "stop_desc": stop.get("stop_desc", ""),
+                            "stop_lat": stop_lat,
+                            "stop_lon": stop_lon,
+                            "distance_meters": round(distance, 1),
+                        }
+                    else:
+                        # Add stop_id to the list
+                        if stop["stop_id"] not in stops_by_name[stop_name]["stop_ids"]:
+                            stops_by_name[stop_name]["stop_ids"].append(stop["stop_id"])
+                        
+                        # Update if this stop is closer
+                        if distance < stops_by_name[stop_name]["distance_meters"]:
+                            stops_by_name[stop_name]["stop_id"] = stop["stop_id"]
+                            stops_by_name[stop_name]["stop_desc"] = stop.get("stop_desc", "")
+                            stops_by_name[stop_name]["stop_lat"] = stop_lat
+                            stops_by_name[stop_name]["stop_lon"] = stop_lon
+                            stops_by_name[stop_name]["distance_meters"] = round(distance, 1)
 
-                    # Add if new location
-                    if location_key not in processed_locations:
-                        nearby_stops.append(
-                            NearbyStopInfo(
-                                stop_id=stop["stop_id"],
-                                stop_name=stop_name,
-                                stop_desc=stop.get("stop_desc", ""),
-                                stop_lat=stop_lat,
-                                stop_lon=stop_lon,
-                                distance_meters=round(distance, 1),
-                            )
-                        )
-                        processed_locations.add(location_key)
+        # Convert to list of NearbyStopInfo
+        nearby_stops = [NearbyStopInfo(**data) for data in stops_by_name.values()]
 
         # Sort by distance (nearest first)
         nearby_stops.sort(key=lambda x: x.distance_meters)

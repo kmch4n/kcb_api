@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore unknown environment variables
 
     def get_gtfs_dir(self) -> str:
         """Get GTFS data directory path"""
