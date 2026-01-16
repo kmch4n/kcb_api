@@ -17,6 +17,7 @@ class GTFSDataLoader:
         self._trips_cache = None
         self._stop_times_cache = None
         self._calendar_cache = None
+        self._calendar_dates_cache = None
         self._fare_attributes_cache = None
         self._fare_rules_cache = None
 
@@ -236,14 +237,47 @@ class GTFSDataLoader:
         self._fare_rules_cache = route_to_fare
         return self._fare_rules_cache
 
+    def load_calendar_dates(self) -> dict:
+        """
+        calendar_dates.txtを読み込み、(service_id, date) → exception_type のマッピングを返す
+
+        exception_type:
+            1 = サービス追加（通常運休日だが運行）
+            2 = サービス削除（通常運行日だが運休）
+
+        Returns:
+            {
+                ("01001", "20260112"): 2,  # 成人の日は運休
+                ("02001", "20260112"): 1,  # 成人の日は運行
+                ...
+            }
+        """
+        if self._calendar_dates_cache is not None:
+            return self._calendar_dates_cache
+
+        calendar_dates_file = os.path.join(self.gtfs_dir, "calendar_dates.txt")
+        calendar_dates = {}
+
+        if os.path.exists(calendar_dates_file):
+            with open(calendar_dates_file, "r", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    service_id = row["service_id"]
+                    date = row["date"]
+                    exception_type = int(row["exception_type"])
+                    calendar_dates[(service_id, date)] = exception_type
+
+        self._calendar_dates_cache = calendar_dates
+        return self._calendar_dates_cache
+
 
 def parse_gtfs_time(time_str: str) -> int:
     """
     GTFS時刻文字列（HH:MM:SS）を分単位に変換
-    
+
     Args:
         time_str: GTFS時刻文字列（例: "14:30:00" or "25:30:00"）
-    
+
     Returns:
         深夜0時からの経過分数
     """
@@ -254,11 +288,11 @@ def parse_gtfs_time(time_str: str) -> int:
 def calculate_travel_time(departure_time: str, arrival_time: str) -> int:
     """
     所要時間を分単位で計算
-    
+
     Args:
         departure_time: "HH:MM:SS"形式（24時以降も可、例: "25:30:00"）
         arrival_time: "HH:MM:SS"形式
-    
+
     Returns:
         所要時間（分）
     """
@@ -267,12 +301,20 @@ def calculate_travel_time(departure_time: str, arrival_time: str) -> int:
     return arr_minutes - dep_minutes
 
 
-def determine_service_ids(day_type: str, loader: GTFSDataLoader = None) -> set[str]:
+def determine_service_ids(
+    day_type: str = None, 
+    date: str = None,
+    loader: GTFSDataLoader = None
+) -> set[str]:
     """
-    運行日タイプから有効なservice_idセットを返す（calendar.txtを動的に参照）
+    運行日タイプまたは日付から有効なservice_idセットを返す
+    
+    dateが指定された場合は、calendar.txtとcalendar_dates.txtを組み合わせて
+    祝日・特別ダイヤを考慮した正確なサービスIDを返す。
 
     Args:
-        day_type: 'weekday', 'saturday', 'sunday'
+        day_type: 'weekday', 'saturday', 'sunday' (dateが未指定の場合に使用)
+        date: 検索日（YYYYMMDD形式、例: '20260112'）指定時は祝日等を考慮
         loader: GTFSDataLoaderインスタンス（Noneの場合は新規取得）
 
     Returns:
@@ -282,6 +324,48 @@ def determine_service_ids(day_type: str, loader: GTFSDataLoader = None) -> set[s
         loader = GTFSDataLoader.get_instance()
 
     calendar_data = loader.load_calendar()
+    calendar_dates = loader.load_calendar_dates()
+    
+    # dateが指定された場合：日付ベースでサービスIDを決定
+    if date is not None:
+        # 日付から曜日を取得
+        try:
+            date_obj = datetime.strptime(date, "%Y%m%d")
+        except ValueError:
+            # YYYY-MM-DD形式もサポート
+            date_obj = datetime.strptime(date.replace("-", ""), "%Y%m%d")
+            date = date.replace("-", "")  # YYYYMMDD形式に正規化
+        
+        weekday_index = date_obj.weekday()  # 0=月曜, 6=日曜
+        weekday_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        weekday_name = weekday_names[weekday_index]
+        
+        service_ids = set()
+        
+        # 1. まず通常のカレンダーで該当曜日に運行するサービスを取得
+        for service_id, calendar_entry in calendar_data.items():
+            # 日付が有効期間内かチェック
+            start_date = calendar_entry.get("start_date", "")
+            end_date = calendar_entry.get("end_date", "")
+            if start_date and end_date:
+                if not (start_date <= date <= end_date):
+                    continue
+            
+            # 該当曜日に運行しているか
+            if calendar_entry.get(weekday_name, "0") == "1":
+                service_ids.add(service_id)
+        
+        # 2. calendar_datesで例外を適用
+        for (svc_id, exc_date), exc_type in calendar_dates.items():
+            if exc_date == date:
+                if exc_type == 2:  # サービス削除（運休）
+                    service_ids.discard(svc_id)
+                elif exc_type == 1:  # サービス追加（臨時運行）
+                    service_ids.add(svc_id)
+        
+        return service_ids
+    
+    # dateが未指定の場合：従来のday_typeベースの処理
     service_ids = set()
 
     # day_typeに応じた曜日フィールドを決定
@@ -408,6 +492,7 @@ def search_bus(
     to_stop_name: str,
     current_time: Optional[str] = None,
     day_type: str = "weekday",
+    date: Optional[str] = None,
 ) -> list[dict]:
     """
     京都市バスの経路を検索する（直通のみ）
@@ -416,7 +501,8 @@ def search_bus(
         from_stop_name: 出発停留所名（例: "堀川下長者町"）
         to_stop_name: 到着停留所名（例: "京都駅前"）
         current_time: 出発時刻（HH:MM形式、例: "14:30"）省略時は現在時刻
-        day_type: 'weekday', 'saturday', 'sunday'
+        day_type: 'weekday', 'saturday', 'sunday' (dateが未指定の場合に使用)
+        date: 検索日（YYYY-MM-DD形式、例: "2026-01-12"）祝日・特別ダイヤを考慮
 
     Returns:
         最大3件の検索結果（到着時刻が早い順）
@@ -476,8 +562,8 @@ def search_bus(
             second = parts[2]
             current_time = f"{hour}:{minute}:{second}"
 
-    # 4. 運行日パターンの決定
-    service_ids = determine_service_ids(day_type)
+    # 4. 運行日パターンの決定（date優先、なければday_type使用）
+    service_ids = determine_service_ids(day_type=day_type, date=date)
 
     # 5. 直通便の検索
     routes_data = loader.load_routes()
