@@ -102,6 +102,7 @@ Find stops within a specified radius of GPS coordinates.
     "stops": [
         {
             "stop_id": "012345",
+            "stop_ids": ["012345", "012346", "012347"],
             "stop_name": "京都駅八条口",
             "stop_desc": "Northbound",
             "stop_lat": 35.001,
@@ -111,6 +112,12 @@ Find stops within a specified radius of GPS coordinates.
     ]
 }
 ```
+
+**Fields:**
+
+-   `stop_id`: Representative stop ID (nearest platform)
+-   `stop_ids`: All stop IDs with the same stop name (all platforms)
+-   `distance_meters`: Distance to the nearest platform
 
 ---
 
@@ -130,11 +137,15 @@ Find direct bus routes between two stops.
     "to_stop": "金閣寺道",
     "current_time": "09:00",
     "day_type": "weekday",
+    "date": "2026-01-12",
     "limit": 3
 }
 ```
 
-_Note: `day_type` can be `weekday`, `saturday`, or `sunday`._
+**Parameters:**
+
+-   `day_type`: `weekday`, `saturday`, or `sunday`. Ignored if `date` is provided.
+-   `date`: (Optional) Search date in `YYYY-MM-DD` format. When provided, holidays and special schedules are considered. Takes priority over `day_type`.
 
 #### Response
 
