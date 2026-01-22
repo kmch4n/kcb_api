@@ -178,7 +178,93 @@ Find direct bus routes between two stops.
 
 ---
 
-### 5. Get Timetable
+### 5. Search Transfer Routes
+
+Find routes with one transfer when no direct route is available.
+
+-   **URL**: `/kcb_api/search/transfer`
+-   **Method**: `POST`
+-   **Auth**: Required
+
+#### Request Body
+
+```json
+{
+    "from_stop": "京都駅前",
+    "to_stop": "銀閣寺道",
+    "current_time": "09:00",
+    "day_type": "weekday",
+    "date": "2026-01-22",
+    "min_transfer_time": 5,
+    "limit": 3
+}
+```
+
+**Parameters:**
+
+-   `from_stop`: Departure stop name (required)
+-   `to_stop`: Arrival stop name (required)
+-   `current_time`: Departure time in HH:MM format (optional, defaults to current time)
+-   `day_type`: `weekday`, `saturday`, or `sunday` (ignored if `date` is provided)
+-   `date`: Search date in `YYYY-MM-DD` format (optional, considers holidays)
+-   `min_transfer_time`: Minimum transfer time in minutes (default: 5, max: 30)
+-   `limit`: Maximum results (default: 5, max: 10)
+
+#### Response
+
+```json
+{
+    "success": true,
+    "query": { ... },
+    "count": 1,
+    "routes": [
+        {
+            "type": "transfer",
+            "total_time_minutes": 41,
+            "legs": [
+                {
+                    "route_name": "市バス７",
+                    "route_id": "00700",
+                    "trip_id": "00700_01001_1298",
+                    "headsign": "",
+                    "departure_stop": "京都駅前",
+                    "departure_stop_id": "061212",
+                    "departure_stop_desc": "京都駅前(A2)",
+                    "departure_time": "09:30:00",
+                    "arrival_stop": "河原町丸太町",
+                    "arrival_stop_id": "005400",
+                    "arrival_stop_desc": "河原町丸太町(C)",
+                    "arrival_time": "09:51:00"
+                },
+                {
+                    "route_name": "市バス２０４",
+                    "route_id": "20400",
+                    "trip_id": "20400_01001_4556",
+                    "headsign": "",
+                    "departure_stop": "河原町丸太町",
+                    "departure_stop_id": "005100",
+                    "departure_stop_desc": "河原町丸太町(D)",
+                    "departure_time": "09:56:00",
+                    "arrival_stop": "銀閣寺道",
+                    "arrival_stop_id": "103400",
+                    "arrival_stop_desc": "銀閣寺道(B)",
+                    "arrival_time": "10:11:00"
+                }
+            ],
+            "transfer_info": {
+                "stop_name": "河原町丸太町",
+                "from_platform": "河原町丸太町(C)",
+                "to_platform": "河原町丸太町(D)",
+                "wait_minutes": 5
+            }
+        }
+    ]
+}
+```
+
+---
+
+### 6. Get Timetable
 
 Get the schedule for a specific stop.
 
@@ -216,7 +302,7 @@ Get the schedule for a specific stop.
 
 ---
 
-### 6. Estimate Bus Location
+### 7. Estimate Bus Location
 
 Estimate the current location of a specific bus trip based on the timetable.
 

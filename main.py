@@ -16,6 +16,7 @@ from config import settings
 from auth import verify_api_key
 from bus_route_search import (
     search_bus,
+    find_transfer_routes,
     GTFSDataLoader,
     search_similar_stop_names,
     parse_gtfs_time,
@@ -107,6 +108,73 @@ class SearchResponse(BaseModel):
     query: dict = Field(..., description="検索条件")
     count: int = Field(..., description="検索結果件数")
     routes: List[BusRoute] = Field(..., description="バス路線リスト")
+
+
+class TransferSearchRequest(BaseModel):
+    """乗り換え検索リクエスト"""
+
+    from_stop: str = Field(..., description="出発停留所名", min_length=1)
+    to_stop: str = Field(..., description="到着停留所名", min_length=1)
+    current_time: Optional[str] = Field(
+        None,
+        description="出発時刻 (HH:MM形式)。省略時は現在時刻",
+        pattern=r"^\d{1,2}:\d{2}(:\d{2})?$",
+    )
+    day_type: str = Field(
+        "weekday",
+        description="運行日タイプ (weekday/saturday/sunday)。dateが指定された場合は無視されます。",
+    )
+    date: Optional[str] = Field(
+        None,
+        description="検索日（YYYY-MM-DD形式）。祝日・特別ダイヤを考慮します。",
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+    )
+    min_transfer_time: int = Field(5, description="最小乗り換え時間（分）", ge=1, le=30)
+    limit: int = Field(5, description="最大結果件数", ge=1, le=10)
+
+
+class TransferLeg(BaseModel):
+    """乗り換え経路の1区間"""
+
+    route_name: str = Field(..., description="路線名")
+    route_id: str = Field(..., description="路線ID")
+    trip_id: str = Field(..., description="便ID")
+    headsign: str = Field(..., description="行き先表示")
+    departure_stop: str = Field(..., description="出発停留所名")
+    departure_stop_id: str = Field(..., description="出発停留所ID")
+    departure_stop_desc: str = Field(..., description="出発停留所詳細")
+    departure_time: str = Field(..., description="出発時刻")
+    arrival_stop: str = Field(..., description="到着停留所名")
+    arrival_stop_id: str = Field(..., description="到着停留所ID")
+    arrival_stop_desc: str = Field(..., description="到着停留所詳細")
+    arrival_time: str = Field(..., description="到着時刻")
+
+
+class TransferInfo(BaseModel):
+    """乗り換え情報"""
+
+    stop_name: str = Field(..., description="乗り換え停留所名")
+    from_platform: str = Field(..., description="降車プラットフォーム")
+    to_platform: str = Field(..., description="乗車プラットフォーム")
+    wait_minutes: int = Field(..., description="乗り換え待ち時間（分）")
+
+
+class TransferRoute(BaseModel):
+    """乗り換え経路"""
+
+    type: str = Field("transfer", description="経路タイプ")
+    total_time_minutes: int = Field(..., description="総所要時間（分）")
+    legs: List[TransferLeg] = Field(..., description="経路区間リスト")
+    transfer_info: TransferInfo = Field(..., description="乗り換え情報")
+
+
+class TransferSearchResponse(BaseModel):
+    """乗り換え検索レスポンス"""
+
+    success: bool = Field(True, description="検索成功フラグ")
+    query: dict = Field(..., description="検索条件")
+    count: int = Field(..., description="検索結果件数")
+    routes: List[TransferRoute] = Field(..., description="乗り換え経路リスト")
 
 
 class ErrorResponse(BaseModel):
@@ -575,14 +643,18 @@ async def get_nearby_stops(
                         # Add stop_id to the list
                         if stop["stop_id"] not in stops_by_name[stop_name]["stop_ids"]:
                             stops_by_name[stop_name]["stop_ids"].append(stop["stop_id"])
-                        
+
                         # Update if this stop is closer
                         if distance < stops_by_name[stop_name]["distance_meters"]:
                             stops_by_name[stop_name]["stop_id"] = stop["stop_id"]
-                            stops_by_name[stop_name]["stop_desc"] = stop.get("stop_desc", "")
+                            stops_by_name[stop_name]["stop_desc"] = stop.get(
+                                "stop_desc", ""
+                            )
                             stops_by_name[stop_name]["stop_lat"] = stop_lat
                             stops_by_name[stop_name]["stop_lon"] = stop_lon
-                            stops_by_name[stop_name]["distance_meters"] = round(distance, 1)
+                            stops_by_name[stop_name]["distance_meters"] = round(
+                                distance, 1
+                            )
 
         # Convert to list of NearbyStopInfo
         nearby_stops = [NearbyStopInfo(**data) for data in stops_by_name.values()]
@@ -887,6 +959,82 @@ async def search_routes(request: SearchRequest, api_key: str = Depends(verify_ap
     except Exception as e:
         # Handle unexpected errors
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error occurred",
+        )
+
+
+@app.post(
+    "/kcb_api/search/transfer",
+    response_model=TransferSearchResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Unauthorized - Invalid API Key"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Bad Request - Invalid parameters",
+        },
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+async def search_transfer_routes(
+    request: TransferSearchRequest, api_key: str = Depends(verify_api_key)
+):
+    """
+    乗り換え経路を検索
+
+    直通便がない場合に、1回乗り換えで目的地に到達できる経路を検索します。
+
+    - **from_stop**: 出発停留所名（例: 京都駅前）
+    - **to_stop**: 到着停留所名（例: 銀閣寺道）
+    - **current_time**: 出発時刻（HH:MM形式）
+    - **day_type**: 運行日タイプ（dateが指定された場合は無視）
+    - **date**: 検索日（祝日・特別ダイヤを考慮）
+    - **min_transfer_time**: 最小乗り換え時間（デフォルト5分）
+    - **limit**: 最大結果件数（デフォルト5件）
+    """
+    try:
+        logger.info(
+            f"Transfer search request: {request.from_stop} -> {request.to_stop}"
+        )
+
+        results = find_transfer_routes(
+            from_stop_name=request.from_stop,
+            to_stop_name=request.to_stop,
+            current_time=request.current_time,
+            day_type=request.day_type,
+            date=request.date,
+            min_transfer_time=request.min_transfer_time,
+            limit=request.limit,
+        )
+
+        # Convert to response model
+        routes = [TransferRoute(**route) for route in results]
+
+        response = TransferSearchResponse(
+            success=True,
+            query={
+                "from_stop": request.from_stop,
+                "to_stop": request.to_stop,
+                "current_time": request.current_time or "現在時刻",
+                "day_type": request.day_type,
+                "date": request.date,
+                "min_transfer_time": request.min_transfer_time,
+                "limit": request.limit,
+            },
+            count=len(routes),
+            routes=routes,
+        )
+
+        logger.info(f"Found {len(routes)} transfer routes")
+        return response
+
+    except ValueError as e:
+        logger.warning(f"Transfer search error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    except Exception as e:
+        logger.error(f"Unexpected error in transfer search: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error occurred",
