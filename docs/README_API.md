@@ -10,9 +10,21 @@ All URLs referenced in the documentation have the following base:
 http://localhost:8000
 ```
 
+## Data Source Notice
+
+The public transit data used by this API is provided by the **[Public Transportation Open Data Center (ODPT)](https://www.odpt.org/)** under the Public Transportation Open Data Basic License.
+
+**If you publish an application using this API**, you are required to notify your end users of the following. Use the `GET /kcb_api/info` endpoint to fetch the notice text programmatically and display it in your app (e.g., in a help or disclaimer screen).
+
+> - The public transit data used in this application is provided by the Public Transportation Open Data Center.
+> - The data is based on information provided by the transit operator but is not guaranteed to be accurate or complete.
+> - Please do not contact the transit operator directly regarding the content displayed in this application.
+
+---
+
 ## Authentication
 
-All endpoints (except Health Check) require an API Key.
+All endpoints (except Health Check and Data Notice) require an API Key.
 Include it in the request header `X-API-Key`.
 
 ```http
@@ -42,7 +54,35 @@ Check operational status of the server.
 
 ---
 
-### 2. Search Stops
+### 2. Data Notice
+
+Returns data source information and the required user notice. Use this to display the notice to end users in your application.
+
+-   **URL**: `/kcb_api/info`
+-   **Method**: `GET`
+-   **Auth**: Not Required
+
+> **Note for app developers:** Display the `notice` array as-is to your end users. The `contact` field contains the API owner's address — **replace it with your own contact address** in your app's disclaimer screen to satisfy the ODPT license requirement.
+
+#### Response
+
+```json
+{
+    "data_source": "公共交通オープンデータセンター",
+    "data_source_url": "https://www.odpt.org/",
+    "operator": "京都市交通局",
+    "notice": [
+        "本アプリケーション等が利用する公共交通データは、公共交通オープンデータセンターにおいて提供されるものです。",
+        "公共交通事業者により提供されたデータを元にしていますが、必ずしも正確・完全なものとは限りません。",
+        "本アプリケーションの表示内容について、公共交通事業者への直接の問合せは行わないでください。"
+    ],
+    "contact": "kmchan@kmchan.jp"
+}
+```
+
+---
+
+### 3. Search Stops
 
 Search for bus stops by name (partial match).
 
@@ -75,7 +115,7 @@ Search for bus stops by name (partial match).
 
 ---
 
-### 3. Search Nearby Stops
+### 4. Search Nearby Stops
 
 Find stops within a specified radius of GPS coordinates.
 
@@ -121,7 +161,7 @@ Find stops within a specified radius of GPS coordinates.
 
 ---
 
-### 4. Search Bus Routes (Direct)
+### 5. Search Bus Routes (Direct)
 
 Find direct bus routes between two stops.
 
@@ -178,7 +218,7 @@ Find direct bus routes between two stops.
 
 ---
 
-### 5. Search Transfer Routes
+### 6. Search Transfer Routes
 
 Find routes with one transfer when no direct route is available.
 
@@ -264,7 +304,7 @@ Find routes with one transfer when no direct route is available.
 
 ---
 
-### 6. Get Timetable
+### 7. Get Timetable
 
 Get the schedule for a specific stop.
 
@@ -302,7 +342,7 @@ Get the schedule for a specific stop.
 
 ---
 
-### 7. Estimate Bus Location
+### 8. Estimate Bus Location
 
 Estimate the current location of a specific bus trip based on the timetable.
 

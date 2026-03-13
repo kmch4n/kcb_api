@@ -32,7 +32,15 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Kyoto City Bus API",
-    description="API for searching Kyoto City Bus routes",
+    description="""京都市バスの経路・時刻表・停留所を検索するAPIです。
+
+## データソースについて
+
+本APIが利用する公共交通データは、**[公共交通オープンデータセンター](https://www.odpt.org/)** において提供されるものです（公共交通オープンデータ基本ライセンス）。
+
+本APIを利用したアプリを公開する際は、エンドユーザーへの通知が義務付けられています。
+`GET /kcb_api/info` エンドポイントで通知文を取得し、アプリ内（ヘルプ・免責事項画面等）に表示してください。
+""",
     version="1.0.0",
     docs_url="/kcb_api/docs",
     redoc_url="/kcb_api/redoc",
@@ -277,6 +285,16 @@ class TripLocationResponse(BaseModel):
     )
 
 
+class DataNoticeResponse(BaseModel):
+    """データソース情報と利用通知"""
+
+    data_source: str = Field(..., description="データ提供元")
+    data_source_url: str = Field(..., description="データ提供元URL")
+    operator: str = Field(..., description="公共交通事業者名")
+    notice: List[str] = Field(..., description="利用通知文（各項目を順番に表示してください）")
+    contact: str = Field(..., description="本アプリに関する問い合わせ先")
+
+
 # ============================================================
 # Utility Functions
 # ============================================================
@@ -362,6 +380,27 @@ async def health_check():
     Health check endpoint (no authentication required)
     """
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/kcb_api/info", response_model=DataNoticeResponse, tags=["General"])
+async def get_data_notice():
+    """
+    データソース情報と利用通知を返します（認証不要）。
+
+    本APIを利用したアプリを公開する際は、このエンドポイントが返す `notice` の内容を
+    アプリのヘルプ・免責事項画面等でエンドユーザーに表示してください。
+    """
+    return DataNoticeResponse(
+        data_source="公共交通オープンデータセンター",
+        data_source_url="https://www.odpt.org/",
+        operator="京都市交通局",
+        notice=[
+            "本アプリケーション等が利用する公共交通データは、公共交通オープンデータセンターにおいて提供されるものです。",
+            "公共交通事業者により提供されたデータを元にしていますが、必ずしも正確・完全なものとは限りません。",
+            "本アプリケーションの表示内容について、公共交通事業者への直接の問合せは行わないでください。",
+        ],
+        contact="kmchan@kmchan.jp",
+    )
 
 
 @app.get(
